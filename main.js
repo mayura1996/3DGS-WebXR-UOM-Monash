@@ -4,6 +4,7 @@
 
 import * as THREE from "three";
 import { SplatMesh } from "@sparkjsdev/spark";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
 // ── DOM references ──────────────────────────────────────────────
 const canvas = document.getElementById("canvas");
@@ -19,6 +20,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 // ── Scene ───────────────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a0f);
+
+// ── Lighting (needed for FBX materials) ─────────────────────────
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 10, 7);
+scene.add(dirLight);
 
 // ── Camera ──────────────────────────────────────────────────────
 const camera = new THREE.PerspectiveCamera(
@@ -161,6 +170,64 @@ if (splatMesh.loaded) {
     overlay.classList.add("hidden");
   }, 4000);
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  AVATAR LOADING (FBX)
+// ═══════════════════════════════════════════════════════════════
+
+const fbxLoader = new FBXLoader();
+fbxLoader.load(
+  "/assets/avatar.fbx",
+  (fbx) => {
+    // -- Debug: log raw bounding box before any adjustments --
+    const rawBox = new THREE.Box3().setFromObject(fbx);
+    const rawSize = rawBox.getSize(new THREE.Vector3());
+    console.log("Avatar raw bounding box size:", rawSize.toArray().map(v => v.toFixed(2)));
+
+    // -- Auto-scale: if the avatar is taller than ~3 units, shrink it --
+    const targetHeight = 1.8; // ~human height in scene units
+    const currentHeight = rawSize.y;
+    if (currentHeight > 0) {
+      const scaleFactor = targetHeight / currentHeight;
+      fbx.scale.setScalar(scaleFactor);
+      console.log(`Avatar scaled by ${scaleFactor.toFixed(4)} (raw height=${currentHeight.toFixed(2)})`);
+    }
+
+    // -- Position at origin, feet on the ground --
+    // Recompute box after scaling
+    const box = new THREE.Box3().setFromObject(fbx);
+    const minY = box.min.y;
+    fbx.position.y -= minY; // shift so feet touch y=0
+
+    // -- Apply fallback material if textures are missing --
+    fbx.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        // If the mesh has no map (texture), apply a neutral material
+        if (!child.material?.map) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0xbbbbbb,
+            roughness: 0.6,
+            metalness: 0.1,
+          });
+        }
+      }
+    });
+
+    scene.add(fbx);
+    console.log("Avatar loaded ✔");
+  },
+  (progress) => {
+    if (progress.total) {
+      const pct = ((progress.loaded / progress.total) * 100).toFixed(0);
+      console.log(`Avatar loading… ${pct}%`);
+    }
+  },
+  (err) => {
+    console.error("Failed to load avatar FBX:", err);
+  }
+);
 
 // ── Auto-frame: position camera so the splat is visible ─────────
 function autoFrame() {
