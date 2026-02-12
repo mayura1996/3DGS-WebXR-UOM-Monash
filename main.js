@@ -1,19 +1,19 @@
 // ─── Gaussian Splat Viewer ─────────────────────────────────────
-// Three.js  +  Spark  +  FPS Fly Camera (Pointer Lock)
+// Three.js + Spark + Third-Person Avatar with Animation
 // ────────────────────────────────────────────────────────────────
 
 import * as THREE from "three";
 import { SplatMesh } from "@sparkjsdev/spark";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
-// ── DOM references ──────────────────────────────────────────────
+// ── DOM refs ────────────────────────────────────────────────────
 const canvas = document.getElementById("canvas");
 const overlay = document.getElementById("loading-overlay");
 const controlsHint = document.getElementById("controls-hint");
 const crosshair = document.getElementById("crosshair");
 
 // ── Renderer ────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -21,257 +21,372 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0a0f);
 
-// ── Lighting (needed for FBX materials) ─────────────────────────
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
-
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(5, 10, 7);
-scene.add(dirLight);
+// ── Lighting ────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+var dl = new THREE.DirectionalLight(0xffffff, 0.8);
+dl.position.set(5, 10, 7);
+scene.add(dl);
 
 // ── Camera ──────────────────────────────────────────────────────
-const camera = new THREE.PerspectiveCamera(
-  60,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  2000
-);
-camera.position.set(0, 2, 10);
+var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(0, 5, 20);
+camera.lookAt(0, 0, 0);
 
-// ═══════════════════════════════════════════════════════════════
-//  FPS FLY CAMERA — Pointer Lock + WASD
-// ═══════════════════════════════════════════════════════════════
+// ── Third-person settings ───────────────────────────────────────
+var WALK_SPEED = 2.0;
+var RUN_SPEED = 5.0;
+var MOUSE_SENS = 0.003;
+var PITCH_MIN = THREE.MathUtils.degToRad(-10);
+var PITCH_MAX = THREE.MathUtils.degToRad(60);
+var CAM_DISTANCE = 5.0;
+var CAM_HEIGHT = 2.5;
+var AVATAR_TURN_SPEED = 10.0;
+var CROSSFADE_DUR = 0.3;
 
-// --- tuning knobs ---
-const MOVE_SPEED = 6.0;   // units / sec
-const FAST_MULTIPLIER = 3.0;   // when Shift is held
-const MOUSE_SENS = 0.002; // radians per pixel of mouse delta
-const PITCH_LIMIT = THREE.MathUtils.degToRad(89); // ±89° — nearly straight up/down
+var cameraYaw = 0;
+var cameraPitch = 0.3;
+var pointerLocked = false;
 
-// --- state ---
-let yaw = 0;    // rotation around world Y  (left/right)
-let pitch = 0;    // rotation around local X   (up/down)
-let pointerLocked = false;
-
-const keysDown = {
-  KeyW: false, KeyS: false, KeyA: false, KeyD: false,
-  Space: false, ControlLeft: false, ControlRight: false,
-  KeyQ: false, KeyE: false, KeyC: false,
-  ShiftLeft: false, ShiftRight: false,
+var keysDown = {
+    KeyW: false, KeyS: false, KeyA: false, KeyD: false,
+    Space: false, ControlLeft: false, ControlRight: false,
+    KeyQ: false, KeyE: false, KeyC: false,
+    ShiftLeft: false, ShiftRight: false
 };
 
-// Initialise yaw / pitch from the camera's current orientation so
-// that auto-frame doesn't cause a jump.
-function syncYawPitchFromCamera() {
-  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
-  yaw = euler.y;
-  pitch = euler.x;
-}
-
 // ── Pointer Lock ────────────────────────────────────────────────
-canvas.addEventListener("click", () => {
-  if (!pointerLocked) canvas.requestPointerLock();
+canvas.addEventListener("click", function () {
+    if (!pointerLocked) canvas.requestPointerLock();
 });
 
-document.addEventListener("pointerlockchange", () => {
-  pointerLocked = (document.pointerLockElement === canvas);
-  controlsHint.classList.toggle("hidden", pointerLocked);
-  crosshair.classList.toggle("visible", pointerLocked);
+document.addEventListener("pointerlockchange", function () {
+    pointerLocked = (document.pointerLockElement === canvas);
+    controlsHint.classList.toggle("hidden", pointerLocked);
+    crosshair.classList.toggle("visible", pointerLocked);
 });
 
-// ── Mouse look ──────────────────────────────────────────────────
-document.addEventListener("mousemove", (e) => {
-  if (!pointerLocked) return;
-
-  yaw -= e.movementX * MOUSE_SENS;
-  pitch -= e.movementY * MOUSE_SENS;
-
-  // Clamp pitch to ±89° — wide range, NOT a tiny lock
-  pitch = THREE.MathUtils.clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
+document.addEventListener("mousemove", function (e) {
+    if (!pointerLocked) return;
+    cameraYaw -= e.movementX * MOUSE_SENS;
+    cameraPitch += e.movementY * MOUSE_SENS;
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch, PITCH_MIN, PITCH_MAX);
 });
 
-// ── Keyboard ────────────────────────────────────────────────────
-document.addEventListener("keydown", (e) => {
-  if (e.code in keysDown) keysDown[e.code] = true;
-  // Prevent default for Space / Ctrl to avoid scrolling / browser shortcuts
-  if (e.code === "Space" || e.code === "ControlLeft" || e.code === "ControlRight") {
-    e.preventDefault();
-  }
+document.addEventListener("keydown", function (e) {
+    if (e.code in keysDown) keysDown[e.code] = true;
+    if (e.code === "Space" || e.code === "ControlLeft" || e.code === "ControlRight") {
+        e.preventDefault();
+    }
 });
-document.addEventListener("keyup", (e) => {
-  if (e.code in keysDown) keysDown[e.code] = false;
+document.addEventListener("keyup", function (e) {
+    if (e.code in keysDown) keysDown[e.code] = false;
 });
+canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
-// Prevent context menu on canvas so right-click doesn't interrupt
-canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-
-// ── Movement helper (called every frame) ────────────────────────
-const _moveDir = new THREE.Vector3();
-const _forward = new THREE.Vector3();
-const _right = new THREE.Vector3();
-
-function updateMovement(dt) {
-  // Build a direction vector from held keys
-  _moveDir.set(0, 0, 0);
-
-  // Forward / back  (camera's forward projected onto XZ or full 3D)
-  _forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
-  // Right
-  _right.set(1, 0, 0).applyQuaternion(camera.quaternion);
-
-  if (keysDown.KeyW) _moveDir.add(_forward);
-  if (keysDown.KeyS) _moveDir.sub(_forward);
-  if (keysDown.KeyA) _moveDir.sub(_right);
-  if (keysDown.KeyD) _moveDir.add(_right);
-
-  // Vertical (world-up)
-  if (keysDown.Space || keysDown.KeyE) _moveDir.y += 1;
-  if (keysDown.ControlLeft || keysDown.ControlRight || keysDown.KeyQ || keysDown.KeyC) _moveDir.y -= 1;
-
-  if (_moveDir.lengthSq() === 0) return;
-  _moveDir.normalize();
-
-  const speed = MOVE_SPEED * ((keysDown.ShiftLeft || keysDown.ShiftRight) ? FAST_MULTIPLIER : 1);
-  camera.position.addScaledVector(_moveDir, speed * dt);
-}
-
-// ── Apply yaw+pitch to camera quaternion ────────────────────────
-const _euler = new THREE.Euler(0, 0, 0, "YXZ");
-
-function applyMouseLook() {
-  _euler.set(pitch, yaw, 0, "YXZ");
-  camera.quaternion.setFromEuler(_euler);
+// ── Input direction helper ──────────────────────────────────────
+function getInputDirection() {
+    var dx = 0, dz = 0;
+    if (keysDown.KeyW) dz -= 1;
+    if (keysDown.KeyS) dz += 1;
+    if (keysDown.KeyA) dx -= 1;
+    if (keysDown.KeyD) dx += 1;
+    var len = Math.sqrt(dx * dx + dz * dz);
+    if (len < 0.01) return null;
+    dx /= len;
+    dz /= len;
+    // Rotate by camera yaw
+    var s = Math.sin(cameraYaw);
+    var c = Math.cos(cameraYaw);
+    return { x: dx * c - dz * s, z: dx * s + dz * c };
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SPLAT LOADING
+//  GAUSSIAN SPLAT
 // ═══════════════════════════════════════════════════════════════
 
-const splatMesh = new SplatMesh({ url: "/Quadrangle.ply" });
-// Flip 180° around X — PLY from COLMAP uses Y-down; Three.js uses Y-up
+var splatMesh = new SplatMesh({ url: "/Quadrangle.ply" });
+// Flip 180 deg around X - PLY from COLMAP uses Y-down; Three.js uses Y-up
 splatMesh.quaternion.set(1, 0, 0, 0);
 scene.add(splatMesh);
 
+console.log("SplatMesh created, loading...");
+
 if (splatMesh.loaded) {
-  splatMesh.loaded
-    .then(() => {
-      console.log("Splat loaded ✔");
-      autoFrame();
-      overlay.classList.add("hidden");
-    })
-    .catch((err) => {
-      console.error("Failed to load splat:", err);
-      document.getElementById("loading-text").textContent =
-        "Error loading splat – see console.";
+    splatMesh.loaded.then(function () {
+        console.log("Splat loaded OK");
+        doAutoFrame();
+        overlay.classList.add("hidden");
+    }).catch(function (err) {
+        console.error("Splat load error:", err);
+        document.getElementById("loading-text").textContent = "Error loading splat";
     });
 } else {
-  setTimeout(() => {
-    autoFrame();
-    overlay.classList.add("hidden");
-  }, 4000);
+    // Spark SplatMesh may not expose .loaded — poll until it has geometry
+    console.log("splatMesh.loaded not available, polling for splat readiness...");
+    var pollCount = 0;
+    var pollTimer = setInterval(function () {
+        pollCount++;
+        var hasChildren = splatMesh.children && splatMesh.children.length > 0;
+        var box = new THREE.Box3().setFromObject(splatMesh);
+        var notEmpty = !box.isEmpty();
+        console.log("Splat poll #" + pollCount + ": children=" + (splatMesh.children ? splatMesh.children.length : 0) + ", boxEmpty=" + box.isEmpty());
+        if (notEmpty || pollCount >= 30) {
+            clearInterval(pollTimer);
+            if (notEmpty) {
+                console.log("Splat ready!");
+            } else {
+                console.log("Splat poll timeout after 60s, proceeding anyway");
+            }
+            doAutoFrame();
+            overlay.classList.add("hidden");
+        }
+    }, 2000);
+}
+
+function doAutoFrame() {
+    console.log("doAutoFrame called");
+    try {
+        var box = new THREE.Box3().setFromObject(splatMesh);
+        if (!box.isEmpty()) {
+            var center = box.getCenter(new THREE.Vector3());
+            var size = box.getSize(new THREE.Vector3());
+            var maxDim = Math.max(size.x, size.y, size.z);
+            var dist = maxDim * 1.5;
+            console.log("Splat center:", center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
+            console.log("Splat size:", size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
+
+            camera.position.set(center.x, center.y + dist * 0.4, center.z + dist);
+            camera.lookAt(center);
+
+            // Also move avatar there if loaded
+            if (avatarObject) {
+                avatarObject.position.set(center.x, center.y + avatarBaseY, center.z);
+            }
+            return;
+        }
+    } catch (e) {
+        console.warn("autoFrame box failed:", e);
+    }
+
+    console.log("autoFrame fallback: camera at (0,5,20)");
+    camera.position.set(0, 5, 20);
+    camera.lookAt(0, 0, 0);
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  AVATAR LOADING (FBX)
+//  AVATAR (Mixamo FBX with skin)
 // ═══════════════════════════════════════════════════════════════
+// avatar.fbx (15MB) = base character mesh with skeleton
+// Idle.fbx (1.6MB) = idle animation (without skin)
+// Walk.fbx (15MB) = walk animation (with or without skin)
 
-const fbxLoader = new FBXLoader();
-fbxLoader.load(
-  "/assets/avatar.fbx",
-  (fbx) => {
-    // -- Debug: log raw bounding box before any adjustments --
-    const rawBox = new THREE.Box3().setFromObject(fbx);
-    const rawSize = rawBox.getSize(new THREE.Vector3());
-    console.log("Avatar raw bounding box size:", rawSize.toArray().map(v => v.toFixed(2)));
+var avatarMixer = null;
+var avatarObject = null;
+var avatarBaseY = 0;
+var avatarActions = {};
+var currentAction = null;
+var currentAnimName = "";
 
-    // -- Auto-scale: if the avatar is taller than ~3 units, shrink it --
-    const targetHeight = 1.8; // ~human height in scene units
-    const currentHeight = rawSize.y;
-    if (currentHeight > 0) {
-      const scaleFactor = targetHeight / currentHeight;
-      fbx.scale.setScalar(scaleFactor);
-      console.log(`Avatar scaled by ${scaleFactor.toFixed(4)} (raw height=${currentHeight.toFixed(2)})`);
+// Load avatar.fbx as the BASE character
+var fbxLoader = new FBXLoader();
+fbxLoader.load("/assets/avatar.fbx", function (fbx) {
+
+    // Compute bounding box
+    fbx.updateMatrixWorld(true);
+    var totalBox = new THREE.Box3();
+    var meshCount = 0;
+    fbx.traverse(function (child) {
+        if (child.isMesh && child.geometry) {
+            meshCount++;
+            child.geometry.computeBoundingBox();
+            if (child.geometry.boundingBox) {
+                var mb = child.geometry.boundingBox.clone();
+                mb.applyMatrix4(child.matrixWorld);
+                totalBox.union(mb);
+            }
+            var posAttr = child.geometry.getAttribute("position");
+            console.log("  Mesh " + meshCount + ": " + child.name
+                + ", verts=" + (posAttr ? posAttr.count : 0)
+                + ", skinned=" + (child.isSkinnedMesh ? "YES" : "no"));
+        }
+    });
+    var rawSize = totalBox.getSize(new THREE.Vector3());
+    console.log("Avatar meshes: " + meshCount + ", size: "
+        + rawSize.x.toFixed(1) + " x " + rawSize.y.toFixed(1) + " x " + rawSize.z.toFixed(1));
+
+    // Scale: Mixamo is usually in cm (h ~170)
+    var h = rawSize.y;
+    if (h > 3) {
+        fbx.scale.setScalar(1.8 / h);
+        console.log("Avatar scaled: " + (1.8 / h).toFixed(4));
+    } else if (h === 0) {
+        fbx.scale.setScalar(0.01);
+        console.log("Avatar bounds empty, using default 0.01 scale");
     }
 
-    // -- Position at origin, feet on the ground --
-    // Recompute box after scaling
-    const box = new THREE.Box3().setFromObject(fbx);
-    const minY = box.min.y;
-    fbx.position.y -= minY; // shift so feet touch y=0
-
-    // -- Apply fallback material if textures are missing --
-    fbx.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        // If the mesh has no map (texture), apply a neutral material
-        if (!child.material?.map) {
-          child.material = new THREE.MeshStandardMaterial({
-            color: 0xbbbbbb,
-            roughness: 0.6,
-            metalness: 0.1,
-          });
+    // Position feet at y=0
+    fbx.updateMatrixWorld(true);
+    var scaledBox = new THREE.Box3();
+    fbx.traverse(function (child) {
+        if (child.isMesh && child.geometry) {
+            child.geometry.computeBoundingBox();
+            if (child.geometry.boundingBox) {
+                var mb2 = child.geometry.boundingBox.clone();
+                mb2.applyMatrix4(child.matrixWorld);
+                scaledBox.union(mb2);
+            }
         }
-      }
+    });
+    if (!scaledBox.isEmpty()) {
+        avatarBaseY = -scaledBox.min.y;
+    }
+    fbx.position.y = avatarBaseY;
+    console.log("Avatar feet offset: " + avatarBaseY.toFixed(3));
+
+    // Apply fallback material if no textures
+    fbx.traverse(function (child) {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (!child.material || !child.material.map) {
+                child.material = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.6, metalness: 0.1 });
+            }
+        }
     });
 
     scene.add(fbx);
-    console.log("Avatar loaded ✔");
-  },
-  (progress) => {
+    avatarObject = fbx;
+    console.log("Avatar added to scene (avatar.fbx)");
+
+    // Log bones
+    var bones = [];
+    fbx.traverse(function (n) { if (n.isBone) bones.push(n.name); });
+    console.log("Avatar bones (" + bones.length + "): " + bones.slice(0, 8).join(", "));
+
+    // Create animation mixer
+    avatarMixer = new THREE.AnimationMixer(fbx);
+
+    // If avatar.fbx itself has embedded animations, register them
+    if (fbx.animations && fbx.animations.length > 0) {
+        console.log("avatar.fbx has " + fbx.animations.length + " embedded clip(s)");
+        fbx.animations.forEach(function (clip, i) {
+            console.log("  [" + i + "] " + clip.name + " (" + clip.duration.toFixed(2) + "s)");
+        });
+    }
+
+    // Load external animation clips
+    loadAnimClip("idle", "/assets/Idle.fbx");
+    loadAnimClip("walk", "/assets/Walk.fbx");
+
+    // Re-frame camera
+    doAutoFrame();
+
+}, function (progress) {
     if (progress.total) {
-      const pct = ((progress.loaded / progress.total) * 100).toFixed(0);
-      console.log(`Avatar loading… ${pct}%`);
+        console.log("Avatar loading: " + ((progress.loaded / progress.total) * 100).toFixed(0) + "%");
     }
-  },
-  (err) => {
-    console.error("Failed to load avatar FBX:", err);
-  }
-);
+}, function (err) {
+    console.error("avatar.fbx load failed:", err);
+});
 
-// ── Auto-frame: position camera so the splat is visible ─────────
-function autoFrame() {
-  try {
-    const box = new THREE.Box3().setFromObject(splatMesh);
-    if (!box.isEmpty()) {
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const dist = maxDim * 1.5;
+// Load an external FBX just for its animation clip
+var animsLoaded = 0;
+var animsTotal = 2; // idle + walk
+function loadAnimClip(name, path) {
+    var loader = new FBXLoader();
+    loader.load(path, function (animFbx) {
+        if (animFbx.animations && animFbx.animations.length > 0) {
+            var clip = animFbx.animations[0];
+            console.log(name + " clip loaded: " + clip.name + " (" + clip.duration.toFixed(2) + "s, " + clip.tracks.length + " tracks)");
+            avatarActions[name] = avatarMixer.clipAction(clip);
+            console.log(name + " animation registered");
+        } else {
+            console.warn(path + " has no animation clips");
+        }
+        animsLoaded++;
+        if (animsLoaded >= animsTotal) {
+            // All animations loaded — start idle
+            if (avatarActions.idle) {
+                avatarActions.idle.play();
+                currentAction = avatarActions.idle;
+                currentAnimName = "idle";
+                console.log("Starting idle animation");
+            } else if (avatarActions.walk) {
+                avatarActions.walk.play();
+                currentAction = avatarActions.walk;
+                currentAnimName = "walk";
+                console.log("No idle clip, starting walk animation");
+            }
+        }
+    }, undefined, function (err) {
+        console.warn("Failed to load " + path + ":", err);
+        animsLoaded++;
+    });
+}
 
-      camera.position.copy(center).add(new THREE.Vector3(0, dist * 0.4, dist));
-      camera.lookAt(center);
-      syncYawPitchFromCamera();
-      console.log(`Auto-framed: center=${center.toArray()}, dist=${dist.toFixed(2)}`);
-      return;
-    }
-  } catch (_) { /* geometry might not be available */ }
+// ── Crossfade ───────────────────────────────────────────────────
+function fadeToAction(name) {
+    if (name === currentAnimName) return;
+    var next = avatarActions[name];
+    if (!next) return;
 
-  // Fallback
-  camera.position.set(0, 5, 20);
-  camera.lookAt(0, 0, 0);
-  syncYawPitchFromCamera();
+    if (currentAction) currentAction.fadeOut(CROSSFADE_DUR);
+    next.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(CROSSFADE_DUR).play();
+    currentAction = next;
+    currentAnimName = name;
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  RENDER LOOP
 // ═══════════════════════════════════════════════════════════════
 
-const clock = new THREE.Clock();
+var clock = new THREE.Clock();
 
-renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.1); // cap to avoid huge jumps on tab-switch
+renderer.setAnimationLoop(function () {
+    var dt = Math.min(clock.getDelta(), 0.1);
 
-  if (pointerLocked) {
-    updateMovement(dt);
-  }
-  applyMouseLook();
-  renderer.render(scene, camera);
+    // Move avatar
+    var dir = getInputDirection();
+    if (avatarObject && dir) {
+        var spd = (keysDown.ShiftLeft || keysDown.ShiftRight) ? RUN_SPEED : WALK_SPEED;
+        avatarObject.position.x += dir.x * spd * dt;
+        avatarObject.position.z += dir.z * spd * dt;
+
+        if (keysDown.Space || keysDown.KeyE) avatarObject.position.y += spd * dt;
+        if (keysDown.ControlLeft || keysDown.ControlRight || keysDown.KeyQ || keysDown.KeyC) {
+            avatarObject.position.y -= spd * dt;
+        }
+
+        // Face movement direction (smooth)
+        var target = Math.atan2(dir.x, dir.z);
+        var cur = avatarObject.rotation.y;
+        var d = target - cur;
+        d = ((d + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+        avatarObject.rotation.y += d * Math.min(1, AVATAR_TURN_SPEED * dt);
+    }
+
+    // Camera follow
+    if (avatarObject) {
+        var ox = CAM_DISTANCE * Math.sin(cameraYaw) * Math.cos(cameraPitch);
+        var oz = CAM_DISTANCE * Math.cos(cameraYaw) * Math.cos(cameraPitch);
+        var oy = CAM_HEIGHT + CAM_DISTANCE * Math.sin(cameraPitch);
+        camera.position.set(avatarObject.position.x + ox, avatarObject.position.y + oy, avatarObject.position.z + oz);
+        camera.lookAt(avatarObject.position.x, avatarObject.position.y + 1.4, avatarObject.position.z);
+    }
+
+    // Animation
+    if (avatarMixer) {
+        avatarMixer.update(dt);
+        var moving = keysDown.KeyW || keysDown.KeyS || keysDown.KeyA || keysDown.KeyD;
+        fadeToAction(moving ? "walk" : "idle");
+    }
+
+    renderer.render(scene, camera);
 });
 
-// ── Responsive resize ───────────────────────────────────────────
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+// ── Resize ──────────────────────────────────────────────────────
+window.addEventListener("resize", function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
