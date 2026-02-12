@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="3D Gaussian Splat Viewer – Quadrangle" />
+  <title>Gaussian Splat Viewer</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text">Loading Gaussian Splat…</p>
+  </div>
+
+  <!-- Controls hint (visible when pointer is NOT locked) -->
+  <div id="controls-hint">
+    <span>Click to look</span> · <span>WASD</span> move · <span>Shift</span> faster ·
+    <span>Space</span> up · <span>Ctrl</span> down · <span>Esc</span> unlock
+  </div>
+
+  <!-- Crosshair (visible when pointer IS locked) -->
+  <div id="crosshair">+</div>
+
+  <script type="module" src="/main.js"></script>
+</body>
+
+</html>
