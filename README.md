@@ -22,3 +22,8 @@ Direct Hongsheng Temple route:
 http://127.0.0.1:5173/?site=hongsheng-temple
 ```
 
+## Adding Heritage Assets
+
+See [ASSET_GUIDE.md](ASSET_GUIDE.md) for the complete process for adding a PLY
+capture, optimizing it for the web, creating a dashboard card, and configuring
+its scene transform and avatar.
