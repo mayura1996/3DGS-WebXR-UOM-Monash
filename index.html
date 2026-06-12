@@ -4,30 +4,186 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="3D Gaussian Splat Viewer – Quadrangle" />
-  <title>Gaussian Splat Viewer</title>
+  <meta name="description" content="Heritage Immersia - explore cultural heritage sites in immersive WebXR." />
+  <title>Heritage Immersia</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 
 <body>
-  <canvas id="canvas"></canvas>
+  <main id="landing-page">
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="Heritage Immersia home">
+        <span class="brand-mark" aria-hidden="true">HI</span>
+        <span>
+          <strong>Heritage Immersia</strong>
+          <small>Stories from the past. Adventures for today.</small>
+        </span>
+      </a>
+      <nav>
+        <a href="#explore">Explore</a>
+        <a href="#about">About</a>
+      </nav>
+    </header>
 
-  <!-- Loading overlay -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <p id="loading-text">Loading Gaussian Splat…</p>
-  </div>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Immersive heritage adventures</span>
+        <h1>Step inside the world's greatest stories.</h1>
+        <p>Explore temples, monuments, and living history through playful WebXR journeys made for curious minds.</p>
+        <a class="primary-cta" href="#explore">Start exploring <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="hero-orbit" aria-hidden="true">
+        <div class="orbit-ring"></div>
+        <div class="temple-shape"><span></span><span></span><span></span></div>
+        <div class="orbit-dot dot-one"></div>
+        <div class="orbit-dot dot-two"></div>
+        <div class="orbit-dot dot-three"></div>
+      </div>
+    </section>
 
-  <!-- Controls hint (visible when pointer is NOT locked) -->
-  <div id="controls-hint">
-    <span>Click</span> to orbit · <span>WASD</span> move avatar · <span>Shift</span> run ·
-    <span>Space</span> up · <span>Ctrl</span> down · <span>Esc</span> unlock
-  </div>
+    <section id="explore" class="explore-section">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Choose your journey</span>
+          <h2>Heritage sites</h2>
+        </div>
+        <p id="site-count">5 adventures</p>
+      </div>
 
-  <!-- Crosshair (visible when pointer IS locked) -->
-  <div id="crosshair">+</div>
+      <div class="filter-bar">
+        <label>
+          <span>Continent</span>
+          <select id="continent-filter">
+            <option value="all">All continents</option>
+            <option value="asia">Asia</option>
+            <option value="europe">Europe</option>
+            <option value="south-america">South America</option>
+          </select>
+        </label>
+        <label>
+          <span>Country</span>
+          <select id="country-filter">
+            <option value="all">All countries</option>
+            <option value="indonesia">Indonesia</option>
+            <option value="china">China</option>
+            <option value="peru">Peru</option>
+            <option value="italy">Italy</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="site-grid" class="site-grid">
+        <article class="site-card featured" data-continent="asia" data-country="indonesia">
+          <div class="card-image candi-image">
+            <span class="status available">WebXR ready</span>
+          </div>
+          <div class="card-content">
+            <div class="card-meta"><span>Indonesia</span><span>9th century</span></div>
+            <h3>Candi Sewu</h3>
+            <p>Walk among the ancient stones of Java's remarkable Buddhist temple complex.</p>
+            <button class="explore-site" data-site="candi-sewu" type="button">Enter experience <span>→</span></button>
+          </div>
+        </article>
+
+        <article class="site-card featured" data-continent="asia" data-country="china">
+          <div class="card-image hongsheng-image">
+            <span class="status available">WebXR ready</span>
+          </div>
+          <div class="card-content">
+            <div class="card-meta"><span>China</span><span>Dali Kingdom era</span></div>
+            <h3>Hongsheng Temple Pagoda</h3>
+            <p>Explore a nationally protected Buddhist pagoda in Dali, distinct from the city's Three Pagodas.</p>
+            <button class="explore-site" data-site="hongsheng-temple" type="button">Enter experience <span>-></span></button>
+          </div>
+        </article>
+
+        <article class="site-card featured" data-continent="asia" data-country="china">
+          <div class="card-image jianshui-image">
+            <span class="status available">WebXR ready</span>
+          </div>
+          <div class="card-content">
+            <div class="card-meta"><span>China</span><span>Founded 1285</span></div>
+            <h3>Jianshui Confucius Temple</h3>
+            <p>Cross the Sea of Learning and explore a Yuan-dynasty center of scholarship and civic life.</p>
+            <button class="explore-site" data-site="jianshui-confucius" type="button">Enter experience <span>-></span></button>
+          </div>
+        </article>
+
+        <article class="site-card" data-continent="south-america" data-country="peru">
+          <div class="card-image illustrated-card machu-card">
+            <span class="status">Coming soon</span>
+            <div class="mountain mountain-one"></div>
+            <div class="mountain mountain-two"></div>
+            <div class="terraces"></div>
+          </div>
+          <div class="card-content">
+            <div class="card-meta"><span>Peru</span><span>15th century</span></div>
+            <h3>Machu Picchu</h3>
+            <p>Discover an Inca city high above the clouds and learn how its people lived.</p>
+            <button class="coming-soon" type="button" disabled>Coming soon</button>
+          </div>
+        </article>
+
+        <article class="site-card" data-continent="europe" data-country="italy">
+          <div class="card-image illustrated-card colosseum-card">
+            <span class="status">Coming soon</span>
+            <div class="colosseum-art"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="card-content">
+            <div class="card-meta"><span>Italy</span><span>80 CE</span></div>
+            <h3>The Colosseum</h3>
+            <p>Travel to ancient Rome and uncover the engineering behind its iconic arena.</p>
+            <button class="coming-soon" type="button" disabled>Coming soon</button>
+          </div>
+        </article>
+      </div>
+      <p id="empty-state" hidden>No sites match those filters yet.</p>
+    </section>
+
+    <section id="about" class="about-strip">
+      <span>Built for discovery</span>
+      <strong>Heritage education meets spatial storytelling.</strong>
+      <p>Move, look, and learn in accessible browser-based experiences.</p>
+    </section>
+  </main>
+
+  <section id="viewer-shell" aria-hidden="true">
+    <canvas id="canvas"></canvas>
+    <div id="loading-overlay" class="hidden">
+      <div class="spinner"></div>
+      <p id="loading-text">Preparing heritage experience...</p>
+    </div>
+
+    <button id="back-to-sites" type="button">← All sites</button>
+    <button id="view-toggle">Switch to First Person</button>
+
+    <aside id="splat-debug">
+      <div class="debug-tabs" role="tablist">
+        <button class="debug-tab active" data-panel="splat-panel" type="button">Splat</button>
+        <button class="debug-tab" data-panel="avatar-panel" type="button">Avatar</button>
+      </div>
+      <section id="splat-panel" class="debug-panel active">
+        <h2>Splat Transform</h2>
+        <label><span>Rotate X <output id="rotation-x-value">-180°</output></span><input id="rotation-x" type="range" min="-180" max="180" step="1" value="-180" /></label>
+        <label><span>Rotate Y <output id="rotation-y-value">-22°</output></span><input id="rotation-y" type="range" min="-180" max="180" step="1" value="-22" /></label>
+        <label><span>Rotate Z <output id="rotation-z-value">0°</output></span><input id="rotation-z" type="range" min="-180" max="180" step="1" value="0" /></label>
+        <label><span>Scale <output id="scale-value">14.1</output></span><input id="scale" type="range" min="0.01" max="30" step="0.01" value="14.1" /></label>
+        <label><span>Position X <output id="position-x-value">-12.00</output></span><input id="position-x" type="range" min="-150" max="150" step="0.1" value="-12" /></label>
+        <label><span>Position Y <output id="position-y-value">3.90</output></span><input id="position-y" type="range" min="-150" max="150" step="0.1" value="3.9" /></label>
+        <label><span>Position Z <output id="position-z-value">3.10</output></span><input id="position-z" type="range" min="-150" max="150" step="0.1" value="3.1" /></label>
+        <div class="debug-actions"><button id="reset-transform" type="button">Reset</button><button id="frame-splat" type="button">Frame Scene</button></div>
+      </section>
+      <section id="avatar-panel" class="debug-panel">
+        <h2>Avatar Transform</h2>
+        <label><span>Scale <output id="avatar-scale-value">1.00×</output></span><input id="avatar-scale" type="range" min="0.2" max="3" step="0.05" value="1" /></label>
+        <div class="debug-actions"><button id="reset-avatar" type="button">Reset Avatar</button></div>
+      </section>
+    </aside>
+
+    <div id="controls-hint"><span>Click</span> look · <span>Scroll</span> zoom · <span>WASD</span> move · <span>Esc</span> unlock</div>
+    <div id="crosshair">+</div>
+  </section>
 
   <script type="module" src="/main.js"></script>
 </body>
-
 </html>

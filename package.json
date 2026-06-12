@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "optimize:splat": "node scripts/optimize-splat.mjs public/Candi1.ply public/Candi1-optimized.spz 350000",
+    "optimize:hongsheng": "node scripts/optimize-splat.mjs source-assets/HongshengTemple.ply public/HongshengTemple-optimized.spz 500000",
+    "optimize:jianshui": "node scripts/optimize-splat.mjs source-assets/jiangshuiConfucius.ply public/JianshuiConfucius-optimized.spz 500000"
   },
   "dependencies": {
     "@sparkjsdev/spark": "^0.1.10",
